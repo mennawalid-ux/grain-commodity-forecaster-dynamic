@@ -1,38 +1,55 @@
-from pathlib import Path
+import requests
 import pandas as pd
-import yfinance as yf
-from config import COMMODITIES, DEFAULT_PERIOD, DEFAULT_INTERVAL
+from pathlib import Path
+import streamlit as st
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data"
-DATA_DIR.mkdir(exist_ok=True)
+ROOT = Path(__file__).resolve().parent
 
-def fetch_prices(period=DEFAULT_PERIOD, interval=DEFAULT_INTERVAL):
-    tickers = list(COMMODITIES.values())
-    raw = yf.download(
-        tickers=tickers,
-        period=period,
-        interval=interval,
-        auto_adjust=True,
-        progress=False,
-        group_by="column",
-        threads=True,
+API_KEY = st.secrets["ALPHAVANTAGE_API_KEY"]
+
+TICKERS = {
+    "Corn": "CORN",
+    "Wheat": "WHEAT",
+    "Soybeans": "SOYBEAN"
+}
+
+def fetch_commodity(symbol):
+    url = (
+        f"https://www.alphavantage.co/query?"
+        f"function=COMMODITY_EXCHANGE_RATE"
+        f"&from_symbol={symbol}"
+        f"&to_symbol=USD"
+        f"&apikey={API_KEY}"
     )
-    if raw.empty:
-        raise RuntimeError("Yahoo Finance returned no data. Try again later or check ticker availability.")
 
-    if isinstance(raw.columns, pd.MultiIndex):
-        close = raw["Close"].copy()
-    else:
-        close = raw[["Close"]].rename(columns={"Close": tickers[0]})
+    response = requests.get(url)
+    data = response.json()
 
-    close = close.reset_index()
-    if "Datetime" in close.columns:
-        close = close.rename(columns={"Datetime": "Date"})
-    close["Date"] = pd.to_datetime(close["Date"]).dt.tz_localize(None)
-    close = close.dropna(how="all", subset=tickers)
-    close.to_csv(DATA_DIR / "latest_prices.csv", index=False)
-    return close
+    if "Realtime Currency Exchange Rate" not in data:
+        raise ValueError(f"No data returned for {symbol}")
 
-if __name__ == "__main__":
-    df = fetch_prices()
-    print(f"Saved {len(df)} rows to data/latest_prices.csv")
+    price = float(
+        data["Realtime Currency Exchange Rate"]["5. Exchange Rate"]
+    )
+
+    return price
+
+rows = []
+
+for name, symbol in TICKERS.items():
+    try:
+        price = fetch_commodity(symbol)
+
+        rows.append({
+            "Commodity": name,
+            "Price": price
+        })
+
+    except Exception as e:
+        print(e)
+
+df = pd.DataFrame(rows)
+
+df.to_csv(ROOT / "latest_prices.csv", index=False)
+
+print(df)
