@@ -1,55 +1,36 @@
-import requests
-import pandas as pd
 from pathlib import Path
-import streamlit as st
+import pandas as pd
 
-ROOT = Path(__file__).resolve().parent
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
 
-API_KEY = st.secrets["ALPHAVANTAGE_API_KEY"]
-
-TICKERS = {
-    "Corn": "CORN",
-    "Wheat": "WHEAT",
-    "Soybeans": "SOYBEAN"
+COMMODITIES = {
+    "Corn Futures": "zc.f",
+    "Wheat Futures": "zw.f",
+    "Soybean Futures": "zs.f",
 }
 
-def fetch_commodity(symbol):
-    url = (
-        f"https://www.alphavantage.co/query?"
-        f"function=COMMODITY_EXCHANGE_RATE"
-        f"&from_symbol={symbol}"
-        f"&to_symbol=USD"
-        f"&apikey={API_KEY}"
-    )
+def fetch_stooq(symbol):
+    url = f"https://stooq.com/q/d/l/?s={symbol}&i=d"
+    df = pd.read_csv(url)
 
-    response = requests.get(url)
-    data = response.json()
-
-    if "Realtime Currency Exchange Rate" not in data:
+    if df.empty:
         raise ValueError(f"No data returned for {symbol}")
 
-    price = float(
-        data["Realtime Currency Exchange Rate"]["5. Exchange Rate"]
-    )
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values("Date")
 
-    return price
+    return df
 
-rows = []
-
-for name, symbol in TICKERS.items():
+for name, symbol in COMMODITIES.items():
     try:
-        price = fetch_commodity(symbol)
+        df = fetch_stooq(symbol)
 
-        rows.append({
-            "Commodity": name,
-            "Price": price
-        })
+        filename = DATA_DIR / f"{symbol.replace('.', '_')}.csv"
+
+        df.to_csv(filename, index=False)
+
+        print(f"Saved {name}")
 
     except Exception as e:
-        print(e)
-
-df = pd.DataFrame(rows)
-
-df.to_csv(ROOT / "latest_prices.csv", index=False)
-
-print(df)
+        print(f"Failed {name}: {e}")
