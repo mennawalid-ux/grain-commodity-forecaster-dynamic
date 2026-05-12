@@ -1,0 +1,43 @@
+name: Daily Grain Futures Update
+
+on:
+  schedule:
+    - cron: "0 7 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch latest Yahoo Finance prices
+        run: python scripts/fetch_data.py
+
+      - name: Train forecasts
+        run: python scripts/train_forecast.py
+
+      - name: Send alerts
+        run: python scripts/send_alerts.py
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/*.csv
+          git commit -m "Update grain futures data and forecasts" || echo "No changes to commit"
+          git push

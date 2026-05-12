@@ -1,0 +1,4 @@
+Commodity,Ticker,LastPrice,Forecast30D,ForecastChangePct,MAPE,MAE,Signal,Alert
+Corn Futures,ZC=F,340.16,359.21,5.6,3.5,11.91,BUY/WATCH,YES
+Wheat Futures,ZW=F,370.99,348.73,-6.0,3.5,12.98,SELL/WATCH,YES
+Soybean Futures,ZS=F,645.09,629.13,-2.47,3.5,22.58,SELL/WATCH,YES
